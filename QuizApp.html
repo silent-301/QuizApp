@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QuizMaster – The Ultimate Quiz App</title>
+  <meta name="description" content="A beautiful MCQ quiz app with registration, login, timer, and results."/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { inter: ['Inter','sans-serif'] },
+          animation: {
+            'fade-up':   'fadeUp 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+            'fade-in':   'fadeIn 0.4s ease-out',
+            'pop':       'pop 0.25s ease-out',
+            'pulse-glow':'pulseGlow 2s ease-in-out infinite',
+            'slide-left':'slideLeft 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+          },
+          keyframes: {
+            fadeUp:   { '0%':{opacity:'0',transform:'translateY(30px)'}, '100%':{opacity:'1',transform:'translateY(0)'} },
+            fadeIn:   { '0%':{opacity:'0'}, '100%':{opacity:'1'} },
+            pop:      { '0%':{transform:'scale(1)'}, '50%':{transform:'scale(1.06)'}, '100%':{transform:'scale(1)'} },
+            pulseGlow:{ '0%,100%':{boxShadow:'0 0 20px rgba(124,58,237,0.3)'}, '50%':{boxShadow:'0 0 40px rgba(124,58,237,0.7)'} },
+            slideLeft:{ '0%':{opacity:'0',transform:'translateX(40px)'}, '100%':{opacity:'1',transform:'translateX(0)'} },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+    body { background: #0a0a14; }
+
+    .glass {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Blobs */
+    .blob1 { position:fixed;top:-100px;left:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,0.25),transparent);animation:floatA 10s ease-in-out infinite;pointer-events:none; }
+    .blob2 { position:fixed;bottom:-80px;right:-80px;width:350px;height:350px;border-radius:50%;background:radial-gradient(circle,rgba(219,39,119,0.2),transparent);animation:floatB 12s ease-in-out infinite;pointer-events:none; }
+    .blob3 { position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.1),transparent);animation:floatC 14s ease-in-out infinite;pointer-events:none; }
+    @keyframes floatA { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(30px,20px) scale(1.08)} }
+    @keyframes floatB { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-20px,15px) scale(1.05)} }
+    @keyframes floatC { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-48%,-52%) scale(1.1)} }
+
+    input { color: white !important; }
+    input::placeholder { color: rgba(255,255,255,0.3) !important; }
+    input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #1a1a2e inset !important; -webkit-text-fill-color: white !important; }
+
+    .page { display:none; }
+    .page.active { display:flex; }
+
+    .input-field {
+      width:100%;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:14px;
+      padding:12px 16px;
+      font-size:14px;
+      outline:none;
+      transition:all 0.3s;
+    }
+    .input-field:focus { border-color:rgba(124,58,237,0.6); background:rgba(124,58,237,0.08); box-shadow:0 0 0 3px rgba(124,58,237,0.15); }
+
+    .btn-primary {
+      width:100%;
+      padding:13px;
+      border-radius:14px;
+      font-weight:700;
+      font-size:15px;
+      cursor:pointer;
+      border:none;
+      transition:all 0.2s;
+      background:linear-gradient(135deg,#7c3aed,#db2777);
+      color:white;
+      box-shadow:0 4px 24px rgba(124,58,237,0.35);
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(124,58,237,0.5); }
+    .btn-primary:active { transform:scale(0.98); }
+
+    /* Option Buttons */
+    .option-btn {
+      width:100%;
+      text-align:left;
+      padding:14px 18px;
+      border-radius:14px;
+      border:2px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.04);
+      color:rgba(255,255,255,0.85);
+      font-size:14px;
+      cursor:pointer;
+      transition:all 0.25s;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .option-btn:hover:not(:disabled) { border-color:rgba(124,58,237,0.5); background:rgba(124,58,237,0.1); transform:translateX(4px); }
+    .option-btn.correct  { border-color:#22c55e !important; background:rgba(34,197,94,0.15) !important; color:#86efac !important; }
+    .option-btn.wrong    { border-color:#ef4444 !important; background:rgba(239,68,68,0.15)  !important; color:#fca5a5 !important; }
+    .option-btn.selected { border-color:rgba(124,58,237,0.7); background:rgba(124,58,237,0.15); }
+    .option-btn:disabled { cursor:default; }
+
+    .option-letter {
+      width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:12px;flex-shrink:0;
+      background:rgba(255,255,255,0.08);
+    }
+
+    /* Timer */
+    .timer-danger { color:#ef4444 !important; animation:timerBlink 0.5s ease-in-out infinite; }
+    @keyframes timerBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Progress */
+    .progress-fill { transition:width 0.5s cubic-bezier(0.34,1.56,0.64,1); background:linear-gradient(90deg,#7c3aed,#db2777); }
+
+    /* Score ring */
+    .score-ring { position:relative;display:inline-flex;align-items:center;justify-content:center; }
+    .score-ring svg { transform:rotate(-90deg); }
+    .score-ring .ring-text { position:absolute;text-align:center; }
+
+    /* Error shake */
+    .shake { animation:shake 0.4s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+
+    /* Spinner */
+    .spinner { width:48px;height:48px;border:4px solid rgba(124,58,237,0.2);border-top-color:#7c3aed;border-radius:50%;animation:spin 0.8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    select { color:white !important; }
+    select option { background:#1a1a2e; color:white; }
+  </style>
+</head>
+<body class="min-h-screen text-white overflow-x-hidden">
+
+  <!-- Background Blobs -->
+  <div class="blob1"></div>
+  <div class="blob2"></div>
+  <div class="blob3"></div>
+
+  <!-- ════════════════════════════════════════
+       PAGE 1 – REGISTER
+  ════════════════════════════════════════ -->
+  <div id="page-register" class="page active min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-md animate-fade-up">
+
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+             style="background:linear-gradient(135deg,#7c3aed,#db2777);box-shadow:0 0 40px rgba(124,58,237,0.4);">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+        <h1 class="text-4xl font-black mb-1" style="background:linear-gradient(135deg,#c4b5fd,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">QuizMaster</h1>
+        <p class="text-gray-500 text-sm">Create your account to get started</p>
+      </div>
+
+      <div class="glass rounded-3xl p-8 shadow-2xl">
+        <h2 class="text-xl font-bold mb-6 text-white">Create Account</h2>
+        <div id="reg-error" class="hidden mb-4 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"></div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Full Name</label>
+            <input id="reg-name" type="text" placeholder="John Doe" class="input-field"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Email Address</label>
+            <input id="reg-email" type="email" placeholder="john@example.com" class="input-field"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Password</label>
+            <input id="reg-password" type="password" placeholder="Min. 6 characters" class="input-field"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Confirm Password</label>
+            <input id="reg-confirm" type="password" placeholder="Repeat password" class="input-field"/>
+          </div>
+          <div class="pt-2">
+            <button class="btn-primary" onclick="register()">Create Account →</button>
+          </div>
+        </div>
+
+        <p class="text-center text-gray-500 text-sm mt-6">
+          Already have an account?
+          <button onclick="goTo('login')" class="text-purple-400 font-semibold hover:text-purple-300 transition-colors ml-1">Sign In</button>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PAGE 2 – LOGIN
+  ════════════════════════════════════════ -->
+  <div id="page-login" class="page min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-md animate-fade-up">
+
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+             style="background:linear-gradient(135deg,#7c3aed,#db2777);box-shadow:0 0 40px rgba(124,58,237,0.4);">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+        <h1 class="text-4xl font-black mb-1" style="background:linear-gradient(135deg,#c4b5fd,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">QuizMaster</h1>
+        <p class="text-gray-500 text-sm">Welcome back! Sign in to continue</p>
+      </div>
+
+      <div class="glass rounded-3xl p-8 shadow-2xl">
+        <h2 class="text-xl font-bold mb-6 text-white">Sign In</h2>
+        <div id="login-error" class="hidden mb-4 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"></div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Email Address</label>
+            <input id="login-email" type="email" placeholder="john@example.com" class="input-field"/>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 font-semibold mb-2 uppercase tracking-wider">Password</label>
+            <input id="login-password" type="password" placeholder="Your password" class="input-field"/>
+          </div>
+          <div class="pt-2">
+            <button class="btn-primary" onclick="login()">Sign In →</button>
+          </div>
+        </div>
+
+        <p class="text-center text-gray-500 text-sm mt-6">
+          New here?
+          <button onclick="goTo('register')" class="text-purple-400 font-semibold hover:text-purple-300 transition-colors ml-1">Create Account</button>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PAGE 3 – START QUIZ
+  ════════════════════════════════════════ -->
+  <div id="page-start" class="page min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-md text-center animate-fade-up">
+
+      <div class="glass rounded-3xl p-10 shadow-2xl">
+        <!-- Icon -->
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl mb-6"
+             style="background:linear-gradient(135deg,#7c3aed,#db2777);box-shadow:0 0 50px rgba(124,58,237,0.5);">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+
+        <h2 class="text-3xl font-black mb-2" style="background:linear-gradient(135deg,#c4b5fd,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+          Ready to Play?
+        </h2>
+        <p id="welcome-name" class="text-gray-400 mb-6 text-sm"></p>
+
+        <!-- Quiz Settings -->
+        <div class="grid grid-cols-2 gap-3 mb-6 text-left">
+          <div>
+            <label class="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Category</label>
+            <select id="sel-category" class="input-field text-sm py-2.5">
+              <option value="">🎲 Any Category</option>
+              <option value="9">🌍 General Knowledge</option>
+              <option value="17">🔬 Science & Nature</option>
+              <option value="21">⚽ Sports</option>
+              <option value="23">📜 History</option>
+              <option value="25">🎨 Art</option>
+              <option value="27">🐾 Animals</option>
+              <option value="18">💻 Computers</option>
+              <option value="19">➗ Mathematics</option>
+              <option value="22">🗺️ Geography</option>
+              <option value="11">🎬 Film</option>
+              <option value="12">🎵 Music</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Difficulty</label>
+            <select id="sel-difficulty" class="input-field text-sm py-2.5">
+              <option value="">⚡ Any Level</option>
+              <option value="easy">🟢 Easy</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="hard">🔴 Hard</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="bg-white/5 rounded-2xl p-4 border border-white/8">
+            <div class="text-2xl font-black text-purple-400">5</div>
+            <div class="text-xs text-gray-500 mt-1">Questions</div>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-4 border border-white/8">
+            <div class="text-2xl font-black text-pink-400">10</div>
+            <div class="text-xs text-gray-500 mt-1">Minutes</div>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-4 border border-white/8">
+            <div class="text-2xl font-black text-blue-400">MCQ</div>
+            <div class="text-xs text-gray-500 mt-1">Format</div>
+          </div>
+        </div>
+
+        <!-- Rules -->
+        <div class="text-left bg-white/3 rounded-2xl p-4 mb-6 border border-white/6 space-y-2">
+          <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-3">📋 Rules</p>
+          <p class="text-sm text-gray-400 flex items-start gap-2"><span class="text-purple-400 mt-0.5">✦</span>Answer all 5 questions one by one</p>
+          <p class="text-sm text-gray-400 flex items-start gap-2"><span class="text-purple-400 mt-0.5">✦</span>Each question has 4 choices — pick one</p>
+          <p class="text-sm text-gray-400 flex items-start gap-2"><span class="text-purple-400 mt-0.5">✦</span>Quiz auto-submits when timer hits 0:00</p>
+          <p class="text-sm text-gray-400 flex items-start gap-2"><span class="text-purple-400 mt-0.5">✦</span>Questions are fetched fresh from the internet 🌐</p>
+        </div>
+
+        <button class="btn-primary text-lg py-4 animate-pulse-glow" onclick="startQuiz()">
+          🚀 &nbsp;Start Quiz
+        </button>
+
+        <button onclick="logout()" class="mt-4 text-xs text-gray-600 hover:text-gray-400 transition-colors block w-full">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PAGE LOADING – Spinner while fetching
+  ════════════════════════════════════════ -->
+  <div id="page-loading" class="page min-h-screen items-center justify-center p-4">
+    <div class="text-center animate-fade-in">
+      <div class="spinner mx-auto mb-6"></div>
+      <h3 class="text-xl font-bold text-white mb-2">Fetching Questions...</h3>
+      <p class="text-gray-500 text-sm">Loading fresh questions from the internet 🌐</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PAGE 4 – QUIZ
+  ════════════════════════════════════════ -->
+  <div id="page-quiz" class="page min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-xl animate-fade-up">
+
+      <!-- Top Bar -->
+      <div class="flex items-center justify-between mb-6 glass rounded-2xl px-5 py-3">
+        <!-- Progress -->
+        <div class="flex items-center gap-3">
+          <span id="q-counter" class="text-sm font-bold text-purple-300">Q 1 / 5</span>
+        </div>
+
+        <!-- Timer -->
+        <div id="timer-display" class="flex items-center gap-2 text-sm font-mono font-bold">
+          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span id="timer-text" class="text-purple-300">10:00</span>
+        </div>
+
+        <!-- Score live -->
+        <span id="live-score" class="text-sm font-bold text-gray-400">Score: 0</span>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="h-1.5 bg-white/10 rounded-full mb-6 overflow-hidden">
+        <div id="progress-bar" class="h-full progress-fill rounded-full" style="width:0%"></div>
+      </div>
+
+      <!-- Question Card -->
+      <div id="question-card" class="glass rounded-3xl p-8 shadow-2xl animate-slide-left">
+        <div class="flex items-center gap-2 mb-5">
+          <span id="q-category" class="text-xs font-semibold px-3 py-1 rounded-full" style="background:rgba(124,58,237,0.2);color:#c4b5fd;border:1px solid rgba(124,58,237,0.3);">General Knowledge</span>
+        </div>
+        <h3 id="question-text" class="text-xl font-bold text-white mb-6 leading-relaxed"></h3>
+
+        <div id="options-container" class="space-y-3"></div>
+
+        <div class="mt-6 flex items-center justify-between">
+          <span id="answer-feedback" class="text-sm font-semibold hidden"></span>
+          <button id="next-btn" onclick="nextQuestion()"
+            class="hidden ml-auto px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 hover:opacity-90 active:scale-95"
+            style="background:linear-gradient(135deg,#7c3aed,#db2777);">
+            Next →
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       PAGE 5 – RESULTS
+  ════════════════════════════════════════ -->
+  <div id="page-result" class="page min-h-screen items-center justify-center p-4">
+    <div class="w-full max-w-md animate-fade-up">
+      <div class="glass rounded-3xl p-8 shadow-2xl text-center">
+
+        <!-- Trophy -->
+        <div id="result-icon" class="text-6xl mb-4"></div>
+        <h2 id="result-title" class="text-3xl font-black mb-1" style="background:linear-gradient(135deg,#c4b5fd,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;"></h2>
+        <p id="result-sub" class="text-gray-400 text-sm mb-6"></p>
+
+        <!-- Score Ring -->
+        <div class="score-ring mb-6">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="58" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12"/>
+            <circle id="score-arc" cx="70" cy="70" r="58" fill="none" stroke="url(#grad)" stroke-width="12"
+                    stroke-linecap="round" stroke-dasharray="364" stroke-dashoffset="364" style="transition:stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1);"/>
+            <defs>
+              <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#7c3aed"/>
+                <stop offset="100%" stop-color="#db2777"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="ring-text">
+            <div id="score-number" class="text-4xl font-black text-white"></div>
+            <div id="out-of" class="text-xs text-gray-400 font-medium">out of 5</div>
+          </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="bg-green-500/10 border border-green-500/20 rounded-2xl p-3">
+            <div id="stat-correct" class="text-2xl font-black text-green-400"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Correct</div>
+          </div>
+          <div class="bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
+            <div id="stat-wrong" class="text-2xl font-black text-red-400"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Wrong</div>
+          </div>
+          <div class="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-3">
+            <div id="stat-pct" class="text-2xl font-black text-purple-400"></div>
+            <div class="text-xs text-gray-500 mt-0.5">Score %</div>
+          </div>
+        </div>
+
+        <!-- Breakdown -->
+        <div id="breakdown" class="text-left space-y-2 mb-6"></div>
+
+        <!-- Buttons -->
+        <button class="btn-primary mb-3" onclick="playAgain()">🔁 &nbsp;Play Again</button>
+        <button onclick="logout()" class="text-xs text-gray-600 hover:text-gray-400 transition-colors w-full">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════ JAVASCRIPT ════════════════ -->
+  <script>
+
+    /* ── Dynamic Questions (fetched from API) ── */
+    let QUESTIONS   = [];  // filled fresh each game
+    const TOTAL_Q   = 5;
+    const TOTAL_TIME = 10 * 60; // 10 minutes in seconds
+
+    /* ── Decode HTML entities from API response ── */
+    function decodeHTML(str) {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    }
+
+    /* ── Shuffle array (Fisher-Yates) ── */
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    /* ── Fetch Questions from Open Trivia DB ── */
+    async function fetchQuestions() {
+      const category   = document.getElementById('sel-category').value;
+      const difficulty = document.getElementById('sel-difficulty').value;
+
+      let url = `https://opentdb.com/api.php?amount=${TOTAL_Q}&type=multiple`;
+      if (category)   url += `&category=${category}`;
+      if (difficulty) url += `&difficulty=${difficulty}`;
+
+      const res  = await fetch(url);
+      const data = await res.json();
+
+      if (data.response_code !== 0 || !data.results.length) {
+        throw new Error('Not enough questions for the selected filters. Try different settings.');
+      }
+
+      // Transform API format → our internal format
+      QUESTIONS = data.results.map(q => {
+        const options = shuffle([...q.incorrect_answers, q.correct_answer]).map(decodeHTML);
+        const correct = options.indexOf(decodeHTML(q.correct_answer));
+        return {
+          category: decodeHTML(q.category),
+          difficulty: q.difficulty,
+          question: decodeHTML(q.question),
+          options,
+          correct
+        };
+      });
+    }
+
+    /* ── State ── */
+    let users         = JSON.parse(localStorage.getItem('qm_users') || '[]');
+    let currentUser   = JSON.parse(localStorage.getItem('qm_current') || 'null');
+    let currentQ      = 0;
+    let score         = 0;
+    let answers       = [];  // {selected, correct}
+    let timerInterval = null;
+    let timeLeft      = TOTAL_TIME;
+    let answered      = false;
+
+    /* ── Page Navigation ── */
+    function goTo(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      window.scrollTo(0,0);
+    }
+
+    /* ── REGISTER ── */
+    function register() {
+      const name     = document.getElementById('reg-name').value.trim();
+      const email    = document.getElementById('reg-email').value.trim().toLowerCase();
+      const password = document.getElementById('reg-password').value;
+      const confirm  = document.getElementById('reg-confirm').value;
+      const errDiv   = document.getElementById('reg-error');
+
+      if (!name || !email || !password || !confirm) return showError(errDiv, 'All fields are required.');
+      if (!email.includes('@') || !email.includes('.')) return showError(errDiv, 'Enter a valid email address.');
+      if (password.length < 6) return showError(errDiv, 'Password must be at least 6 characters.');
+      if (password !== confirm) return showError(errDiv, 'Passwords do not match.');
+      if (users.find(u => u.email === email)) return showError(errDiv, 'An account with this email already exists.');
+
+      users.push({ name, email, password });
+      localStorage.setItem('qm_users', JSON.stringify(users));
+
+      errDiv.classList.add('hidden');
+      goTo('login');
+    }
+
+    /* ── LOGIN ── */
+    function login() {
+      const email    = document.getElementById('login-email').value.trim().toLowerCase();
+      const password = document.getElementById('login-password').value;
+      const errDiv   = document.getElementById('login-error');
+
+      if (!email || !password) return showError(errDiv, 'Please fill in all fields.');
+
+      const user = users.find(u => u.email === email && u.password === password);
+      if (!user) return showError(errDiv, 'Invalid email or password.');
+
+      currentUser = user;
+      localStorage.setItem('qm_current', JSON.stringify(user));
+      errDiv.classList.add('hidden');
+      document.getElementById('welcome-name').textContent = `Hello, ${user.name} 👋`;
+      goTo('start');
+    }
+
+    /* ── LOGOUT ── */
+    function logout() {
+      clearInterval(timerInterval);
+      localStorage.removeItem('qm_current');
+      currentUser = null;
+      goTo('login');
+    }
+
+    /* ── START QUIZ ── */
+    async function startQuiz() {
+      goTo('loading');  // show spinner
+
+      try {
+        await fetchQuestions();
+      } catch (err) {
+        // Go back to start and alert
+        goTo('start');
+        const errBox = document.createElement('div');
+        errBox.className = 'fixed top-6 left-1/2 -translate-x-1/2 z-50 glass rounded-2xl px-6 py-4 text-red-300 text-sm font-medium shadow-2xl border border-red-500/20 animate-fade-in';
+        errBox.textContent = '⚠️ ' + err.message;
+        document.body.appendChild(errBox);
+        setTimeout(() => errBox.remove(), 4000);
+        return;
+      }
+
+      currentQ  = 0;
+      score     = 0;
+      answers   = [];
+      timeLeft  = TOTAL_TIME;
+      answered  = false;
+
+      document.getElementById('out-of').textContent = `out of ${QUESTIONS.length}`;
+      document.getElementById('timer-text').textContent = '10:00';
+      document.getElementById('timer-text').classList.remove('timer-danger');
+      document.getElementById('live-score').textContent = 'Score: 0';
+
+      goTo('quiz');
+      loadQuestion();
+      startTimer();
+    }
+
+    /* ── LOAD A QUESTION ── */
+    function loadQuestion() {
+      answered = false;
+      const q = QUESTIONS[currentQ];
+      const letters = ['A','B','C','D'];
+
+      document.getElementById('q-counter').textContent    = `Q ${currentQ + 1} / ${QUESTIONS.length}`;
+      document.getElementById('q-category').textContent   = q.category;
+      document.getElementById('question-text').textContent = q.question;
+      document.getElementById('progress-bar').style.width  = (currentQ / QUESTIONS.length * 100) + '%';
+      document.getElementById('answer-feedback').classList.add('hidden');
+      document.getElementById('next-btn').classList.add('hidden');
+
+      const container = document.getElementById('options-container');
+      container.innerHTML = '';
+
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt}</span>`;
+        btn.onclick = () => selectOption(i);
+        container.appendChild(btn);
+      });
+
+      // Animate card
+      const card = document.getElementById('question-card');
+      card.classList.remove('animate-slide-left');
+      void card.offsetWidth;
+      card.classList.add('animate-slide-left');
+    }
+
+    /* ── SELECT OPTION ── */
+    function selectOption(selected) {
+      if (answered) return;
+      answered = true;
+
+      const q       = QUESTIONS[currentQ];
+      const buttons = document.querySelectorAll('.option-btn');
+      const isRight = selected === q.correct;
+
+      if (isRight) score++;
+      answers.push({ selected, correct: q.correct, isRight, options: q.options, question: q.question });
+      document.getElementById('live-score').textContent = 'Score: ' + score;
+
+      // Style buttons
+      buttons.forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === q.correct)   btn.classList.add('correct');
+        if (i === selected && !isRight) btn.classList.add('wrong');
+      });
+
+      // Feedback
+      const fb = document.getElementById('answer-feedback');
+      fb.classList.remove('hidden');
+      if (isRight) {
+        fb.textContent = '✅ Correct!';
+        fb.className = 'text-sm font-semibold text-green-400';
+      } else {
+        fb.textContent = `❌ Wrong! Correct: ${String.fromCharCode(65 + q.correct)}`;
+        fb.className = 'text-sm font-semibold text-red-400';
+      }
+
+      // Show next / finish
+      const nextBtn = document.getElementById('next-btn');
+      nextBtn.classList.remove('hidden');
+      nextBtn.textContent = currentQ < QUESTIONS.length - 1 ? 'Next →' : 'See Results';
+    }
+
+    /* ── NEXT QUESTION ── */
+    function nextQuestion() {
+      currentQ++;
+      if (currentQ < QUESTIONS.length) {
+        loadQuestion();
+      } else {
+        endQuiz();
+      }
+    }
+
+    /* ── TIMER ── */
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        const m = Math.floor(timeLeft / 60).toString().padStart(2,'0');
+        const s = (timeLeft % 60).toString().padStart(2,'0');
+        const display = document.getElementById('timer-text');
+        display.textContent = `${m}:${s}`;
+
+        if (timeLeft <= 60) display.classList.add('timer-danger');
+        if (timeLeft <= 0)  { clearInterval(timerInterval); endQuiz(); }
+      }, 1000);
+    }
+
+    /* ── END QUIZ ── */
+    function endQuiz() {
+      clearInterval(timerInterval);
+      document.getElementById('progress-bar').style.width = '100%';
+
+      const total = QUESTIONS.length;
+      const wrong = total - score;
+      const pct   = Math.round((score / total) * 100);
+
+      // Title / Icon
+      let icon, title, sub;
+      if (pct === 100)     { icon='🏆'; title='Perfect Score!';   sub='You got every question right. Outstanding!'; }
+      else if (pct >= 80)  { icon='🥇'; title='Excellent!';       sub='Great job! You really know your stuff.'; }
+      else if (pct >= 60)  { icon='🥈'; title='Good Job!';        sub='Solid effort! Keep practicing to improve.'; }
+      else if (pct >= 40)  { icon='🥉'; title='Keep Trying!';     sub='Not bad! A little more study will help.'; }
+      else                 { icon='📚'; title='Need More Study';  sub='Don\'t give up — keep learning and try again!'; }
+
+      document.getElementById('result-icon').textContent    = icon;
+      document.getElementById('result-title').textContent   = title;
+      document.getElementById('result-sub').textContent     = sub;
+      document.getElementById('score-number').textContent   = score;
+      document.getElementById('out-of').textContent         = `out of ${total}`;
+      document.getElementById('stat-correct').textContent   = score;
+      document.getElementById('stat-wrong').textContent     = wrong;
+      document.getElementById('stat-pct').textContent       = pct + '%';
+      // Reset arc
+      document.getElementById('score-arc').style.strokeDashoffset = 364;
+
+      // Animate ring
+      setTimeout(() => {
+        const circumference = 364;
+        const offset = circumference - (pct / 100) * circumference;
+        document.getElementById('score-arc').style.strokeDashoffset = offset;
+      }, 200);
+
+      // Breakdown (use data stored in answers, no need to re-read QUESTIONS)
+      const bd = document.getElementById('breakdown');
+      bd.innerHTML = '<p class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Answer Breakdown</p>';
+
+      answers.forEach(a => {
+        const div = document.createElement('div');
+        div.className = `flex items-start gap-3 p-3 rounded-xl text-sm ${a.isRight ? 'bg-green-500/8 border border-green-500/15' : 'bg-red-500/8 border border-red-500/15'}`;
+        div.innerHTML = `
+          <span class="mt-0.5 text-base">${a.isRight ? '✅' : '❌'}</span>
+          <div>
+            <p class="text-gray-300 font-medium leading-snug">${a.question}</p>
+            ${!a.isRight
+              ? `<p class="text-xs text-red-400 mt-0.5">Your answer: ${a.options[a.selected]}</p>
+                 <p class="text-xs text-green-400">Correct: ${a.options[a.correct]}</p>`
+              : ''}
+          </div>
+        `;
+        bd.appendChild(div);
+      });
+
+      // Skipped questions (timer ran out before completion)
+      if (answers.length < total) {
+        for (let i = answers.length; i < total; i++) {
+          const q = QUESTIONS[i];
+          const div = document.createElement('div');
+          div.className = 'flex items-start gap-3 p-3 rounded-xl text-sm bg-yellow-500/8 border border-yellow-500/15';
+          div.innerHTML = `
+            <span class="mt-0.5 text-base">⏭️</span>
+            <div><p class="text-gray-400 font-medium leading-snug">${q.question}</p>
+            <p class="text-xs text-yellow-400 mt-0.5">Skipped (time ran out)</p></div>
+          `;
+          bd.appendChild(div);
+        }
+      }
+
+      goTo('result');
+    }
+
+    /* ── PLAY AGAIN ── */
+    function playAgain() {
+      goTo('start');
+    }
+
+    /* ── HELPER: Show Error ── */
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.classList.add('shake');
+      setTimeout(() => el.classList.remove('shake'), 500);
+    }
+
+    /* ── AUTO LOGIN if session exists ── */
+    window.onload = () => {
+      if (currentUser) {
+        document.getElementById('welcome-name').textContent = `Hello, ${currentUser.name} 👋`;
+        goTo('start');
+      } else {
+        goTo('register');
+      }
+    };
+
+    /* ── Enter key on forms ── */
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const active = document.querySelector('.page.active');
+      if (!active) return;
+      if (active.id === 'page-register')  register();
+      else if (active.id === 'page-login') login();
+    });
+  </script>
+</body>
+</html>
